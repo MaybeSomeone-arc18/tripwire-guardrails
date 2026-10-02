@@ -149,3 +149,19 @@ test("dist/*.cjs is in sync with src/", async () => {
   const after = ["index", "rules", "judge", "normalize", "stream", "express"].map((n) => readFileSync(`dist/${n}.cjs`, "utf8"));
   assert.deepEqual(after, before, "run `npm run build` and commit dist/");
 });
+
+test("openai-compatible judge provider: request shape, JSON reply, fails closed on junk and HTTP errors", async () => {
+  const { createJudge } = await import("tripwire-guardrails/judge");
+  let seen;
+  const ok = (content, status = 200) => async (url, init) => { seen = { url, body: JSON.parse(init.body), headers: init.headers }; return { ok: status === 200, status, json: async () => ({ choices: [{ message: { content } }] }) }; };
+  const mk = (fetchImpl) => createJudge({ provider: "openai", endpoint: "http://localhost:9999", model: "gemma-x", fetchImpl, retries: 0 });
+  const allow = await mk(ok('```json\n{"verdict":"allow","category":"none","reason":"fine"}\n```')).judge("hello");
+  assert.equal(allow.verdict, "allow");
+  assert.equal(seen.url, "http://localhost:9999/v1/chat/completions");
+  assert.equal(seen.body.model, "gemma-x");
+  assert.equal(seen.body.response_format.type, "json_object");
+  assert.equal((await mk(ok('{"verdict":"block","category":"prompt_injection","reason":"x"}')).judge("x")).verdict, "block");
+  assert.equal((await mk(ok("none")).judge("x")).verdict, "block");        // not JSON: fail closed
+  assert.equal((await mk(ok("", 500)).judge("x")).verdict, "block");       // HTTP error: fail closed
+  assert.throws(() => createJudge({ provider: "nope", apiKey: "k" }), /unknown provider/);
+});
