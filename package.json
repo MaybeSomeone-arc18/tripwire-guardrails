@@ -3,27 +3,44 @@
   "version": "0.1.0",
   "description": "Small drop-in guardrails for LLM apps: rule checks first, optional open-model judge (Gemma) for the gray zone.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "./dist/index.cjs",
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
-      "default": "./src/index.js"
+      "import": "./src/index.js",
+      "require": "./dist/index.cjs"
     },
     "./judge": {
       "types": "./src/judge.d.ts",
-      "default": "./src/judge.js"
-    }
+      "import": "./src/judge.js",
+      "require": "./dist/judge.cjs"
+    },
+    "./express": {
+      "types": "./src/express.d.ts",
+      "import": "./src/express.js",
+      "require": "./dist/express.cjs"
+    },
+    "./stream": {
+      "types": "./src/stream.d.ts",
+      "import": "./src/stream.js",
+      "require": "./dist/stream.cjs"
+    },
+    "./policies/*": "./policies/*",
+    "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "node scripts/build-cjs.mjs",
     "test": "node --test test/*.test.js",
     "eval": "node eval/run.mjs && node eval/run-heldout.mjs"
   },
   "license": "MIT",
   "bin": {
-    "tripwire": "bin/tripwire.js"
+    "tripwire": "bin/tripwire.js",
+    "tripwire-server": "bin/tripwire-server.js"
   },
   "files": [
     "src",
+    "dist",
     "bin",
     "policies",
     "README.md",
@@ -32,5 +49,20 @@
   "engines": {
     "node": ">=20"
   },
-  "types": "./src/index.d.ts"
+  "types": "./src/index.d.ts",
+  "module": "./src/index.js",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MaybeSomeone-arc18/tripwire-guardrails.git"
+  },
+  "homepage": "https://maybesomeone-arc18.github.io/tripwire-guardrails/demo/standalone.html",
+  "keywords": [
+    "llm",
+    "guardrails",
+    "prompt-injection",
+    "pii",
+    "security",
+    "gemma"
+  ]
 }
