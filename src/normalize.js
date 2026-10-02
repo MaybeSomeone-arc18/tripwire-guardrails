@@ -46,19 +46,23 @@ function printable(s) {
   return s.length >= 8 && /^[\x09\x0a\x0d\x20-\x7e]+$/.test(s);
 }
 
+function bytesToText(bytes) {
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return ""; }
+}
+
 export function decodeSegments(text) {
   const out = [];
   for (const m of text.matchAll(/[A-Za-z0-9+/_-]{24,}={0,2}/g)) {
     try {
-      const s = Buffer.from(m[0].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+      const bin = atob(m[0].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, ""));
+      const s = bytesToText(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
       if (printable(s)) out.push({ via: "base64", text: s });
     } catch { /* not base64 */ }
   }
   for (const m of text.matchAll(/\b(?:[0-9a-fA-F]{2}){12,}\b/g)) {
-    try {
-      const s = Buffer.from(m[0], "hex").toString("utf8");
-      if (printable(s)) out.push({ via: "hex", text: s });
-    } catch { /* not hex */ }
+    const bytes = Uint8Array.from(m[0].match(/../g), (h) => parseInt(h, 16));
+    const s = bytesToText(bytes);
+    if (printable(s)) out.push({ via: "hex", text: s });
   }
   return out;
 }
