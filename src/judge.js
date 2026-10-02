@@ -33,27 +33,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function createJudge({
   apiKey,
   model = "gemma-4-26b-a4b-it",
+  provider = "gemini",   // "gemini" (Google AI Studio, tested) or "ollama" (self-hosted, UNTESTED: never run against a real server)
+  endpoint,              // base URL override. gemini default: generativelanguage.googleapis.com; ollama default: http://localhost:11434
   timeoutMs = 15000,
   retries = 2,        // extra attempts after the first, for 429/5xx, timeouts and network errors
   backoffMs = 500,    // doubles each retry
   fetchImpl = globalThis.fetch,
   sleepImpl = sleep,
 } = {}) {
-  if (!apiKey) throw new Error("createJudge: apiKey is required");
+  if (provider !== "gemini" && provider !== "ollama") throw new Error(`createJudge: unknown provider "${provider}"`);
+  if (provider === "gemini" && !apiKey) throw new Error("createJudge: apiKey is required");
 
   async function attempt(body) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const res = await fetchImpl(`${ENDPOINT}/${model}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(body),
-        signal: ctl.signal,
-      });
+      const res = provider === "ollama"
+        ? await fetchImpl(`${endpoint ?? "http://localhost:11434"}/api/chat`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ model, stream: false, format: "json", options: { temperature: 0 }, messages: [{ role: "user", content: body.prompt }] }),
+            signal: ctl.signal,
+          })
+        : await fetchImpl(`${endpoint ?? ENDPOINT}/${model}:generateContent`, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify(body.gemini),
+            signal: ctl.signal,
+          });
       if (!res.ok) return { retry: RETRYABLE.has(res.status), result: { verdict: "block", category: "judge_error", reason: `Judge HTTP ${res.status}, failing closed.` } };
       const data = await res.json();
-      return { retry: false, result: parseJudgeReply(extractAnswer(data)) };
+      return { retry: false, result: parseJudgeReply(provider === "ollama" ? data?.message?.content : extractAnswer(data)) };
     } catch (err) {
       return { retry: true, result: { verdict: "block", category: "judge_error", reason: `Judge call failed (${err.name}: ${String(err.message).slice(0, 80)}), failing closed.` } };
     } finally {
@@ -63,9 +73,10 @@ export function createJudge({
 
   return {
     async judge(text, { direction = "input" } = {}) {
+      const prompt = `${INSTRUCTIONS}\n\nDIRECTION: ${direction}\n<<<TEXT\n${String(text).slice(0, 4000)}\nTEXT>>>`;
       const body = {
-        contents: [{ role: "user", parts: [{ text: `${INSTRUCTIONS}\n\nDIRECTION: ${direction}\n<<<TEXT\n${String(text).slice(0, 4000)}\nTEXT>>>` }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 1024 },
+        prompt,
+        gemini: { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 1024 } },
       };
       let last;
       for (let i = 0; i <= retries; i++) {
