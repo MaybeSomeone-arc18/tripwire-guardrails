@@ -52,6 +52,90 @@ code { font-family: ui-monospace,Menlo,monospace; font-size: 13px; }
   <footer>Rules only here. The optional Gemma judge needs an API key and lives in <code>src/judge.js</code>.</footer>
 </main>
 <script>
+// Text variants for scanning. Attackers rarely type the plain phrase, so the rules also run on
+// cleaned-up and decoded versions of the input. Every variant is derived from the same text;
+// nothing is fetched or executed.
+
+const ZERO_WIDTH = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g;
+
+// Cyrillic and Greek letters that look like Latin ones.
+const CONFUSABLES = {
+  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", і: "i", ј: "j", ѕ: "s", һ: "h", ԁ: "d", ɡ: "g",
+  А: "A", В: "B", Е: "E", К: "K", М: "M", Н: "H", О: "O", Р: "P", С: "C", Т: "T", Х: "X",
+  ο: "o", ν: "v", ι: "i", α: "a", ρ: "p", τ: "t", Ο: "O", Α: "A", Β: "B", Ε: "E", Ι: "I",
+};
+
+const LEET = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s" };
+
+function stripInvisible(text) {
+  return text.replace(ZERO_WIDTH, "");
+}
+
+function foldConfusables(text) {
+  return [...text].map((c) => CONFUSABLES[c] ?? c).join("");
+}
+
+// "i g n o r e" -> "ignore"; "ignore-all-previous" -> "ignore all previous"
+function unspace(text) {
+  const joined = text.replace(/\b(?:[A-Za-z] ){3,}[A-Za-z]\b/g, (m) => m.replace(/ /g, ""));
+  return joined.replace(/(?<=[A-Za-z])[-_.](?=[A-Za-z])/g, " ");
+}
+
+// Only touches words that mix letters and digits, so "4111 1111" and plain numbers stay as they are.
+function deleet(text) {
+  return text.replace(/\b[\p{L}\d@$]{3,}\b/gu, (w) => {
+    if (!/[A-Za-z]/.test(w) || !/[\d@$]/.test(w)) return w;
+    return [...w].map((c) => LEET[c] ?? c).join("");
+  });
+}
+
+function rot13(text) {
+  return text.replace(/[A-Za-z]/g, (c) => {
+    const base = c <= "Z" ? 65 : 97;
+    return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+  });
+}
+
+function printable(s) {
+  return s.length >= 8 && /^[\x09\x0a\x0d\x20-\x7e]+$/.test(s);
+}
+
+function bytesToText(bytes) {
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return ""; }
+}
+
+function decodeSegments(text) {
+  const out = [];
+  for (const m of text.matchAll(/[A-Za-z0-9+/_-]{24,}={0,2}/g)) {
+    try {
+      const bin = atob(m[0].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, ""));
+      const s = bytesToText(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+      if (printable(s)) out.push({ via: "base64", text: s });
+    } catch { /* not base64 */ }
+  }
+  for (const m of text.matchAll(/\b(?:[0-9a-fA-F]{2}){12,}\b/g)) {
+    const bytes = Uint8Array.from(m[0].match(/../g), (h) => parseInt(h, 16));
+    const s = bytesToText(bytes);
+    if (printable(s)) out.push({ via: "hex", text: s });
+  }
+  return out;
+}
+
+// Returns [{via, text}] with the original first. Duplicates are dropped.
+function variants(text) {
+  const base = stripInvisible(text.normalize("NFKC"));
+  const folded = foldConfusables(base);
+  const list = [
+    { via: "original", text },
+    { via: "normalized", text: unspace(folded) },
+    { via: "leetspeak", text: unspace(deleet(folded)) },
+    { via: "rot13", text: rot13(folded) },
+  ];
+  for (const d of decodeSegments(folded)) list.push({ via: d.via, text: unspace(foldConfusables(d.text)) });
+  const seen = new Set();
+  return list.filter((v) => (seen.has(v.text) ? false : seen.add(v.text)));
+}
+
 // Each rule: id, category, severity (1 low .. 3 block), pattern, and a short reason.
 // Rules are plain data so you can copy one, tweak it, or delete it.
 
@@ -85,12 +169,73 @@ const INPUT_RULES = [
     reason: "Contains chat-template markers that look like a forged system turn.",
   },
   {
+    id: "inj.exfil-template",
+    category: "prompt_injection",
+    severity: 3,
+    pattern: /!\[[^\]]*\]\(https?:\/\/[^)\s]*(\{\{|%7B%7B|\$\{)[^)]*\)/i,
+    reason: "Markdown image whose URL carries a template placeholder, a classic data-leak trick.",
+  },
+  {
     id: "inj.exfil-link",
     category: "prompt_injection",
     severity: 2,
     pattern: /!\[[^\]]*\]\(https?:\/\/[^)\s]*[?&][^)\s]*(\{|%7B|data=|q=)[^)]*\)/i,
     reason: "Markdown image with a query string can leak data when rendered.",
   },
+];
+
+
+// Paraphrases, personas, prompt-extraction and indirect injection (English).
+const PARAPHRASE_RULES = [
+  { id: "inj.persona-no-rules", category: "prompt_injection", severity: 3,
+    pattern: /\b(ai|assistant|model|bot|chatbot|you)\b[^.\n]{0,40}\b(no rules|without (any )?(restrictions?|limits?|filters?|guardrails?)|no (restrictions?|limits|filters))\b/i,
+    reason: "Asks for an assistant with no rules or restrictions." },
+  { id: "inj.forget-told", category: "prompt_injection", severity: 3,
+    pattern: /\bforget what (the|your) (developer|creator|operator|owner|system) (told|said|gave)\b|\b(disregard|forget|drop|stop following)\b[^.\n]{0,40}\b(told|guidelines?|developer|setup|configuration|instructions?|rules?)\b[^.\n]{0,40}\b(before|earlier|previously|for this|and (reply|answer|say|tell|print|show|output)|new)\b/i,
+    reason: "Tries to drop earlier guidance." },
+  { id: "inj.rules-void", category: "prompt_injection", severity: 3,
+    pattern: /\b(your|all|the)\s+(\w+\s+)?(rules?|guidelines?|guidance|instructions?)\s+(are|is)?\s*(now\s+)?(void|null|cancelled|canceled|no longer (apply|applies|valid))\b|\bno longer applies?\b[^.\n]{0,30}\b(guidance|rules?|instructions?)\b|\b(guidance|rules?|instructions?)\b[^.\n]{0,30}\bno longer apply\b/i,
+    reason: "Declares the earlier rules void." },
+  { id: "inj.clean-slate", category: "prompt_injection", severity: 2,
+    pattern: /\b(start over|reset)\b[^.\n]{0,30}\b(clean slate|from scratch|fresh)\b[^.\n]{0,80}\b(earlier|previous|prior|your)\b/i,
+    reason: "Frames a reset of the assistant's earlier setup." },
+  { id: "inj.new-orders", category: "prompt_injection", severity: 2,
+    pattern: /\bnew (orders|instructions|policy|rules)\s*:/i,
+    reason: "Announces replacement orders." },
+  { id: "inj.extract-config", category: "prompt_injection", severity: 3,
+    pattern: /\b(exact words|verbatim|word for word|in full|quote|repeat back|write out|list every)\b[^.\n]{0,80}\b(message|prompt|instructions?|rules?|guidelines?|setup|configuration)\b[^.\n]{0,40}\b(configured|gave|given|told|set up|you had|you were|you received|original)\b|\b(configured|gave|given|told) you\b[^.\n]{0,60}\b(exact words|verbatim|quote|in full)\b|\b(original|initial|hidden|developer)\s+(instructions?|setup|prompt|message)\b[^.\n]{0,30}\b(word for word|verbatim|in full)\b|\bwhat were the (exact )?words\b[^.\n]{0,60}\bconfigured you\b/i,
+    reason: "Tries to extract the assistant's hidden configuration." },
+  { id: "inj.note-to-assistant", category: "prompt_injection", severity: 3,
+    pattern: /\b(note|message|instruction)s? (to|for) (the )?(ai|assistant|model|llm|agent)\b[^.\n]{0,60}\b(skip|ignore|instead|send|forward|do not|don't)\b/i,
+    reason: "Text addressed to the assistant inside content (indirect injection)." },
+  { id: "inj.send-data-out", category: "prompt_injection", severity: 3,
+    pattern: /\b(send|forward|email|post|upload)\b[^.\n]{0,40}\b(saved notes|chat history|conversation|user'?s? (data|notes|messages)|memory|system prompt)\b[^.\n]{0,40}\b(to|at)\b[^.\n]{0,20}(https?:\/\/|[\w.+-]+@[\w-]+\.|address below)/i,
+    reason: "Asks the assistant to send private data to an outside address." },
+  { id: "inj.obey-fully", category: "prompt_injection", severity: 2,
+    pattern: /\byou must (now )?obey\b|\bobey the user (fully|completely)\b/i,
+    reason: "Demands unconditional obedience." },
+];
+
+// Other languages. Each pattern pairs an ignore-verb with an instructions-noun in the same language.
+const MULTILINGUAL_RULES = [
+  { id: "inj.es", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignora|olvida|descarta)\b[^.\n]{0,40}\b(instrucciones|reglas)\b|\b(muestra|revela|imprime)\b[^.\n]{0,30}\b(prompt del sistema|instrucciones ocultas)\b/iu,
+    reason: "Instruction override or prompt extraction (Spanish)." },
+  { id: "inj.fr", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignore|oublie|ignorez)\b[^.\n]{0,40}\b(instructions|règles)\b|\b(révèle|montre|affiche)\b[^.\n]{0,30}\b(prompt système|instructions cachées)\b/iu,
+    reason: "Instruction override or prompt extraction (French)." },
+  { id: "inj.de", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignoriere|vergiss|missachte)\b[^.\n]{0,40}\b(anweisungen|regeln)\b|\b(zeige|verrate|gib)\b[^.\n]{0,30}\b(system-?prompt)\b/iu,
+    reason: "Instruction override or prompt extraction (German)." },
+  { id: "inj.hi-deva", category: "prompt_injection", severity: 3,
+    pattern: /(निर्देश|नियम)[^\n।.]{0,30}(अनदेखा|नज़रअंदाज़|नजरअंदाज|भूल)|(अनदेखा|नज़रअंदाज़|नजरअंदाज|भूल)[^\n।.]{0,30}(निर्देश|नियम)|सिस्टम\s*प्रॉम्प्ट[^\n।.]{0,20}(दिखा|बता|प्रिंट)/u,
+    reason: "Instruction override or prompt extraction (Hindi)." },
+  { id: "inj.hinglish", category: "prompt_injection", severity: 3,
+    pattern: /\b(instructions?|rules?|niyam)\b[^.\n]{0,30}\b(ignore|bhool|bhul|ignore karo)\b|\b(ignore|bhool|bhul)\s*(karo|jao|kar do)?\b[^.\n]{0,30}\b(instructions?|rules?)\b|\bsystem prompt\b[^.\n]{0,20}\b(batao|bata do|dikhao|print karo)\b|\bhidden instructions?\b[^.\n]{0,40}\b(print|batao|dikhao)\b/i,
+    reason: "Instruction override or prompt extraction (Hinglish)." },
+  { id: "inj.zh", category: "prompt_injection", severity: 3,
+    pattern: /忽略[^\n。]{0,12}(指令|提示|规则)|(显示|透露|输出)[^\n。]{0,10}(系统提示|系统提示词)/u,
+    reason: "Instruction override or prompt extraction (Chinese)." },
 ];
 
 const SECRET_RULES = [
@@ -150,6 +295,7 @@ const OUTPUT_RULES = [
 
 
 
+
 const JUDGEABLE = new Set(["prompt_injection", "off_topic", "prompt_leak"]);
 
 const DEFAULT_POLICY = {
@@ -161,6 +307,8 @@ const DEFAULT_POLICY = {
   topics: null,
   maxInputChars: 8000,
   redactWith: "[REDACTED]",
+  // Also scan unicode-folded, de-spaced, leetspeak, ROT13 and base64/hex-decoded variants of the input.
+  scanVariants: true,
 };
 
 function createGuard(policy = {}) {
@@ -189,11 +337,14 @@ function createGuard(policy = {}) {
   }
 
   function verdict(findings, text) {
-    const top = findings.reduce((s, f) => Math.max(s, f.severity), 0);
+    let top = findings.reduce((s, f) => Math.max(s, f.severity), 0);
+    // Two separate medium-severity manipulation signals together are treated as a block.
+    const mediums = new Set(findings.filter((f) => f.category === "prompt_injection" && f.severity >= 2).map((f) => f.id));
+    if (mediums.size >= 2) top = Math.max(top, p.blockAt);
     return {
       allowed: top < p.blockAt,
       severity: top,
-      findings: findings.map(({ start, end, ...f }) => ({ ...f, snippet: text.slice(start, Math.min(end, start + 60)) })),
+      findings: findings.map(({ start, end, snippet, ...f }) => ({ ...f, snippet: snippet ?? text.slice(start, Math.min(end, start + 60)) })),
       categories: [...new Set(findings.map((f) => f.category))],
       // Gray zone: a manipulation-type rule fired but not hard enough to block. Pattern matches on
       // secrets and PII are already decisive, so only these categories are worth a model call.
@@ -212,7 +363,17 @@ function createGuard(policy = {}) {
 
   function checkInput(text) {
     const t = String(text ?? "");
-    const findings = [...run(INPUT_RULES, t), ...run(SECRET_RULES, t), ...run(PII_RULES, t)];
+    const findings = [...run(SECRET_RULES, t), ...run(PII_RULES, t)];
+    // Manipulation rules also run on cleaned-up and decoded variants of the text.
+    const seen = new Set();
+    for (const v of variants(t)) {
+      if (p.scanVariants === false && v.via !== "original") continue;
+      for (const f of run([...INPUT_RULES, ...PARAPHRASE_RULES, ...MULTILINGUAL_RULES], v.text)) {
+        if (seen.has(f.id)) continue;
+        seen.add(f.id);
+        findings.push(v.via === "original" ? f : { ...f, via: v.via, start: 0, end: 0, snippet: v.text.slice(f.start, f.end) });
+      }
+    }
     if (t.length > p.maxInputChars) {
       findings.push({ id: "in.too-long", category: "size", severity: p.blockAt, reason: `Input is over ${p.maxInputChars} characters.`, start: 0, end: 0 });
     }
