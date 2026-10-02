@@ -82,7 +82,7 @@ createGuard({
 });
 ```
 
-Two ready-made policies are in `policies/` (`import p from "tripwire-guardrails/policies/support-bot.json" with { type: "json" }`).
+A ready-made policy for a support bot is in `policies/support-bot.json` (`import p from "tripwire-guardrails/policies/support-bot.json" with { type: "json" }`).
 
 ### Your own rules
 
