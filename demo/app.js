@@ -36,3 +36,17 @@ document.querySelectorAll("[data-sample]").forEach((b) =>
 document.querySelectorAll("input[name=dir]").forEach((r) => r.addEventListener("change", run));
 $("text").value = samples.injection;
 run();
+
+$("askjudge").addEventListener("click", async () => {
+  const out = $("judgeresult");
+  const key = $("key").value.trim();
+  if (!key) { out.textContent = "Paste an AI Studio key first."; return; }
+  out.textContent = "Asking gemma-4-26b-a4b-it...";
+  const dir = document.querySelector("input[name=dir]:checked").value;
+  const j = await createJudge({ apiKey: key }).judge($("text").value, { direction: dir });
+  const failed = j.category === "judge_error" || j.category === "unparsed";
+  out.className = failed ? "bad" : j.verdict === "allow" ? "ok" : "bad";
+  out.innerHTML = failed
+    ? `<strong>No verdict.</strong> ${escapeHtml(j.reason)} (the library would block here: fail closed)`
+    : `<strong>Gemma: ${j.verdict}</strong> <code>${escapeHtml(j.category)}</code> ${escapeHtml(j.reason)} <small>(${j.attempts} attempt${j.attempts > 1 ? "s" : ""})</small>`;
+});
