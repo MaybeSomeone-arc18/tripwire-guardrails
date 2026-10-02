@@ -99,3 +99,13 @@ test("gives up after the retry budget and fails closed", async () => {
   assert.equal(r.category, "judge_error");
   assert.equal(n, 2);
 });
+
+test("ollama provider builds the request it documents (shape only, never run against a real server)", async () => {
+  let seen;
+  const judge = createJudge({ provider: "ollama", model: "gemma3", endpoint: "http://box:11434", fetchImpl: async (url, init) => { seen = { url, body: JSON.parse(init.body) }; return { ok: true, status: 200, json: async () => ({ message: { content: '{"verdict":"block","category":"prompt_injection","reason":"x"}' } }) }; } });
+  const r = await judge.judge("hello");
+  assert.equal(seen.url, "http://box:11434/api/chat");
+  assert.equal(seen.body.model, "gemma3");
+  assert.equal(r.verdict, "block");
+  assert.throws(() => createJudge({ provider: "nope" }));
+});
