@@ -65,16 +65,9 @@
   </div>
 </section>
 
-<section class="facts" aria-label="At a glance">
-  <div><b>0</b><span>dependencies</span></div>
-  <div><b>48</b><span>tests, CI on Node 20 and 22</span></div>
-  <div><b>37.5%</b><span>rules alone, fresh attacks</span></div>
-  <div><b>91.7%</b><span>rules plus Gemma, same set</span></div>
-</section>
-
 <section id="use" class="block">
   <h2>Use it</h2>
-  <p class="sub">Two calls. One before the model, one after. Node 20 and 22, import or require, no build step. Not on npm yet: install from GitHub.</p>
+  <p class="sub">One check before the model, one after. Node 20+, import or require. Not on npm yet: install from GitHub.</p>
   <div class="tabs" role="tablist" aria-label="Usage">
     <button role="tab" aria-selected="true" aria-controls="p-guard" id="t-guard">Guard</button>
     <button role="tab" aria-selected="false" aria-controls="p-express" id="t-express" tabindex="-1">Express</button>
@@ -118,7 +111,7 @@ npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructi
   <ul class="plain">
     <li><b>Rules are data.</b> One file of regexes with a reason on every finding. Copy one, change it, delete it.</li>
     <li><b>Fails closed.</b> If the judge errors, times out or returns junk, the text is blocked.</li>
-    <li><b>Swappable judge.</b> Change the model name, or write your own object with a <code>judge(text)</code> method. An <code>ollama</code> provider exists for a self-hosted server and is untested.</li>
+    <li><b>Swappable judge.</b> Change the model name, or write your own object with a <code>judge(text)</code> method. An <code>ollama</code> provider exists but is untested.</li>
   </ul>
 </section>
 
@@ -138,12 +131,11 @@ npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructi
   <h2>Measured, not promised</h2>
   <p class="sub">Two test sets I wrote, in <code>eval/</code>. I tuned the rules against the first. I never tuned on the second, so it is the honest one.</p>
   <div class="bars" id="bars">
-    <div class="bar" style="--v:35.9"><div class="row"><span>Tuned set, rules before the work</span><b>35.9%</b></div><div class="track"><i></i></div></div>
-    <div class="bar" style="--v:100"><div class="row"><span>Tuned set, rules after <small>(39 hostile, 50 benign, 0 false positives)</small></span><b>100%</b></div><div class="track"><i></i></div></div>
+    <div class="bar" style="--v:100"><div class="row"><span>Tuned set, rules alone <small>(39 hostile, 50 benign, 0 false positives)</small></span><b>100%</b></div><div class="track"><i></i></div></div>
     <div class="bar hl" style="--v:37.5"><div class="row"><span>Held-out set, rules alone <small>(24 hostile, 24 benign, 0 false positives)</small></span><b>37.5%</b></div><div class="track"><i></i></div></div>
     <div class="bar hl" style="--v:91.7"><div class="row"><span>Held-out set, rules plus Gemma</span><b>91.7%</b></div><div class="track"><i></i></div></div>
   </div>
-  <p class="fine">Recall on hostile texts. Gemma (<code>gemma-4-26b-a4b-it</code>, AI Studio free tier) stopped 22 of 24 on real verdicts. Two more were blocked only because the call failed, and I don't count those as caught. On benign texts: 1 real false positive (a card-shaped student ID) and 1 blocked by a failed call. 3 of 38 judge calls failed after retries. One run, 48 texts, one author: a rough signal, not a benchmark.</p>
+  <p class="fine">Recall on hostile texts. Gemma (<code>gemma-4-26b-a4b-it</code>, AI Studio free tier) gave a real block on 22 of 24; calls that failed are blocked but not counted as caught. On benign texts it falsely blocked 1 (a card-shaped student ID). 3 of 38 calls failed after retries. One run, 48 texts, one author: a rough signal, not a benchmark.</p>
 </section>
 
 <section id="limits" class="block">
@@ -152,21 +144,19 @@ npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructi
     <li>Not a complete defence. Prompt injection has none. Treat this as one layer.</li>
     <li>Rules are English-first and miss many fresh paraphrases: 37.5% on the held-out set.</li>
     <li>The judge is a model. It can be wrong or attacked itself, and a flaky free endpoint blocks some good text.</li>
-    <li>I ran Gemma on the hosted free tier, not locally, and didn't compare it with a closed model.</li>
-    <li>No streaming, per-user policies or logging. Attacks inside documents or tool output are covered only if you pass that text through <code>checkInput</code>.</li>
+        <li>Streamed replies: text already sent can't be taken back. No per-user policies or logging. Attacks inside documents or tool output are covered only if you pass that text through <code>checkInput</code>.</li>
   </ul>
 </section>
 
 <section class="block credits">
   <h2>Why it exists</h2>
   <p>Built for Prudhvi, for the DEV Hacktoberfest Weekend Challenge "Build for a Friend". We kept having the same argument while building AI projects: trust the model, or put a separate layer of checks around it. This is the separate layer, small enough to read in one sitting.</p>
-  <p class="fine">Written during the challenge window (Oct 2 to 5, 2026) with an AI agent doing most of the coding and testing, steered and reviewed by me. Aadhaar uses the public Verhoeff checksum and cards use Luhn. MIT licensed. Fonts: Schibsted Grotesk and JetBrains Mono, SIL Open Font License 1.1, embedded in the page.</p>
+  <p class="fine">Written during the challenge window (Oct 2 to 5, 2026) with an AI agent doing most of the coding and testing, steered and reviewed by me. MIT licensed.</p>
 </section>
 </main>
 
 <footer class="foot">
   <a class="solid" href="https://github.com/MaybeSomeone-arc18/tripwire-guardrails">View the code on GitHub</a>
-  <span>Tripwire 0.1.0 · MIT · fonts under OFL 1.1</span>
 </footer>
 
 <script type="module">
