@@ -1,0 +1,7 @@
+{
+  "blockAt": 2,
+  "ignoreCategories": [],
+  "topics": ["order", "refund", "invoice", "delivery", "account"],
+  "maxInputChars": 2000,
+  "redactWith": "[hidden]"
+}
