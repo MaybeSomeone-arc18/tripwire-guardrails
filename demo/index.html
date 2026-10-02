@@ -143,6 +143,7 @@ npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructi
   <h2>Limits</h2>
   <ul class="plain">
     <li>Not a complete defence. Prompt injection has none. Treat this as one layer.</li>
+    <li>Speed: rules take about 0.07 ms for a sentence and 0.6 ms for 1,100 characters (one 2-CPU machine). A model judge adds a network call; local 1B Gemma took about 2.2 s. Hosted Gemma was not timed.</li>
     <li>Rules are English-first and miss many fresh paraphrases: 41.7% on the held-out set, and 20.0% on an outside benchmark.</li>
     <li>The judge is a model. It can be wrong or attacked itself, and a flaky free endpoint blocks some good text.</li>
         <li>Streamed replies: text already sent can't be taken back. No per-user policies or logging. Attacks inside documents or tool output are covered only if you pass that text through <code>checkInput</code>.</li>
