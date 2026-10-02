@@ -104,14 +104,14 @@ export const SECRET_RULES = [
   { id: "sec.aws-access-key", category: "secret", severity: 3, pattern: /\bAKIA[0-9A-Z]{16}\b/, reason: "Looks like an AWS access key id." },
   { id: "sec.github-token", category: "secret", severity: 3, pattern: /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{40,}\b/, reason: "Looks like a GitHub token." },
   { id: "sec.google-api-key", category: "secret", severity: 3, pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, reason: "Looks like a Google API key." },
-  { id: "sec.openai-style-key", category: "secret", severity: 3, pattern: /\bsk-[A-Za-z0-9_-]{20,}\b/, reason: "Looks like a secret API key (sk-...)." },
+  { id: "sec.openai-style-key", category: "secret", severity: 3, pattern: /\bsk-[A-Za-z0-9_-]{20,}/, reason: "Looks like a secret API key (sk-...)." },
   { id: "sec.slack-token", category: "secret", severity: 3, pattern: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/, reason: "Looks like a Slack token." },
   { id: "sec.private-key", category: "secret", severity: 3, pattern: /-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/, reason: "Contains a private key block." },
   { id: "sec.jwt", category: "secret", severity: 2, pattern: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/, reason: "Looks like a JSON web token." },
 ];
 
 export const PII_RULES = [
-  { id: "pii.email", category: "pii", severity: 1, pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, reason: "Email address." },
+  { id: "pii.email", category: "pii", severity: 1, pattern: /\b[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}\b/, reason: "Email address." },
   { id: "pii.phone-in", category: "pii", severity: 1, pattern: /(?<!\d)(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)/, reason: "Indian mobile number." },
   { id: "pii.aadhaar", category: "pii", severity: 3, pattern: /(?<!\d[ -]?)[2-9]\d{3}[ -]?\d{4}[ -]?\d{4}(?![ -]?\d)/, reason: "12-digit number that passes the Aadhaar (Verhoeff) check.", check: verhoeff },
   { id: "pii.pan", category: "pii", severity: 2, pattern: /\b[A-Z]{5}\d{4}[A-Z]\b/, reason: "Shaped like an Indian PAN." },
