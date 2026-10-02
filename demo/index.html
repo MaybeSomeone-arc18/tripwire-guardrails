@@ -27,11 +27,22 @@
     </label>
   </div>
   <div id="result" role="status"></div>
-  <footer>Rules only here. The optional Gemma judge needs an API key and lives in <code>src/judge.js</code>.</footer>
+  <details id="judgebox">
+    <summary>Ask Gemma too (optional, needs your own free Google AI Studio key)</summary>
+    <p class="note">Your key stays in this page and goes only to <code>generativelanguage.googleapis.com</code>, in a header. Nothing is stored. The text you check is sent to Google when you press the button.</p>
+    <div class="row">
+      <input id="key" type="password" placeholder="AI Studio API key" autocomplete="off" aria-label="AI Studio API key">
+      <button id="askjudge">Ask Gemma</button>
+    </div>
+    <div id="judgeresult" role="status"></div>
+  </details>
+  <footer>Rules run in your browser and send nothing anywhere. The judge code is <code>src/judge.js</code>.</footer>
 </main>
 <script type="module">
   import { createGuard } from "../src/index.js";
+  import { createJudge } from "../src/judge.js";
   window.createGuard = createGuard;
+  window.createJudge = createJudge;
   await import("./app.js");
 </script>
 </body>
