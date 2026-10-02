@@ -55,13 +55,18 @@ A verdict looks like this:
 
 | Where | Category | Examples |
 | --- | --- | --- |
-| input | `prompt_injection` | "ignore previous instructions", "reveal your system prompt", role swaps, forged `</system>` or `[INST]` markers, markdown images that carry data in the URL |
+| input | `prompt_injection` | "ignore previous instructions", "reveal your system prompt", role swaps, paraphrased overrides, "note to the assistant" indirect injection, forged `</system>` or `[INST]` markers, markdown images that carry data in the URL |
+| input | `prompt_injection` (other languages) | the same override and prompt-extraction ideas in Spanish, French, German, Hindi (Devanagari), Hinglish and Chinese |
 | input and output | `secret` | AWS, GitHub, Google, Slack and `sk-` style keys, private key blocks, JWTs |
 | input and output | `pii` | email, Indian mobile numbers, Aadhaar (Verhoeff checked), PAN, card numbers (Luhn checked) |
 | output | `prompt_leak` | "my system prompt is ..." |
 | input | `size`, `off_topic` | max length, optional topic allowlist |
 
 Severity runs 1 to 3. A finding at or above `blockAt` (default 3) blocks. Lower findings pass but show up in the verdict.
+
+### Obfuscation and encoding
+
+Before the manipulation rules run, the input is also scanned in these forms: Unicode-folded (full-width letters, zero-width characters, Cyrillic/Greek look-alikes), de-spaced (`i g n o r e`, `ignore-all-previous`), leetspeak (`1gn0re`), ROT13, and base64 or hex segments decoded. A finding from a variant carries `via: "normalized" | "leetspeak" | "rot13" | "base64" | "hex"`. Turn it off with `scanVariants: false`. Two separate medium-severity manipulation signals in one text count as a block.
 
 ### Policy
 
@@ -107,21 +112,30 @@ const verdict = await checkWithJudge(guard, judge, text, "input", { always: true
 - Gemma 4 returns its reasoning as separate `thought` parts. The judge ignores those and reads only the final answer.
 - Swap `model` for any other model on the same API. Or replace `judge.js`; `checkWithJudge` only needs an object with `judge(text, { direction })`.
 
-Free AI Studio keys have rate limits. Under a burst, requests can fail; the judge then blocks (fail closed) and says why in `reason`.
+Free AI Studio keys have rate limits and the API sometimes answers 5xx. The judge retries 429, 5xx, timeouts and network errors (`retries: 2`, backoff doubling from `backoffMs: 500`) and reports `attempts` in the result. If it still fails, it blocks (fail closed) and says why in `reason`.
 
 ## What was tested
 
-Run `npm test`: 29 tests, all passing in my sandbox (Node 22). CI runs them on Node 20 and 22.
+`npm test`: 37 tests, all passing in my sandbox (Node 22). CI runs them on Node 20 and 22.
 
-- Rules: unit tests per category, plus a corpus of 12 benign and 12 hostile strings I wrote by hand. All benign allowed, all hostile blocked. That corpus is a regression check, not a benchmark. I wrote the rules and the strings, so it flatters them.
-- Judge logic: tested against a fake `fetch` (parsing, fail-closed paths, header use, thought parts, always mode).
-- Live Gemma, once, by hand: 8 hand-written texts (4 benign, 4 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. I did not get a model verdict for that text.
-- On those same 4 hostile texts, the rules alone blocked none. One was flagged as gray zone (a forged `<system>` tag); the other three had no findings at all. That is why `always` mode exists.
+### Rules: two measured sets (`npm run eval`)
+
+| Set | Hostile | Benign | Recall | False positives | How it was made |
+| --- | --- | --- | --- | --- | --- |
+| `eval/corpus.mjs` (tuned) | 39 | 50 | 100% (39/39) | 0/50 | Written by me. I wrote the rules while looking at its misses. Before the rule work the same set scored 35.9% recall, 0 false positives. |
+| `eval/heldout.mjs` (held out) | 24 | 24 | 41.7% (10/24) | 0/24 | Fresh phrasings written after I froze the rules for that round. I did not tune on it. One test string had a wrong card checksum and I fixed the string, not the rules. |
+
+Read the first row as "the rules do what I built them to do on cases I knew about". Read the second as the honest estimate for unseen attacks: the regexes catch about four in ten, and they miss many paraphrases, indirect requests ("echo your configuration block"), role claims ("I'm the new operator") and some non-English phrasings (Italian, Portuguese, French with different wording). Both sets are small and written by one person, so these are not benchmark numbers. This is the case for the judge and its `always` mode.
+
+### Everything else
+
+- Judge logic against a fake `fetch`: parsing, fail-closed paths, retries, header use, thought parts, `always` mode.
+- Live Gemma, once, by hand, before the normalization work: 8 hand-written texts (4 benign, 4 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. On those 4 hostile texts the rules at that time blocked none. I have not yet run the judge over the held-out set.
 
 ## What this does not do
 
 - It is not a complete defence. Prompt injection has no complete defence today. Treat this as one layer.
-- Rules are English-first. Hinglish, other languages, obfuscation (spacing, leetspeak, base64) and attacks hidden in documents or tool output are mostly not covered.
+- Rules cover English plus a few languages by hand-written patterns. Unseen paraphrases mostly get through (41.7% recall on the held-out set). Attacks hidden in documents, images or tool output are not covered unless you pass that text through `checkInput` too.
 - The judge is a model and can be wrong or be targeted itself. Its prompt marks the text as data, which helps and does not make it immune.
 - PII patterns are shape checks. Aadhaar and card numbers are checksum-checked, email and phone are not verified, names and addresses are not detected.
 - Redaction replaces matched spans only.
