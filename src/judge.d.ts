@@ -10,7 +10,7 @@ export interface JudgeResult {
 export interface JudgeOptions {
   apiKey?: string;
   model?: string;
-  provider?: "gemini" | "ollama";
+  provider?: "gemini" | "ollama" | "openai";
   endpoint?: string;
   timeoutMs?: number;
   retries?: number;
