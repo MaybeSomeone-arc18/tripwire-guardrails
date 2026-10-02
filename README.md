@@ -11,18 +11,22 @@ I built it because I kept having the same argument while building AI projects: t
 
 ## Install
 
-Not on npm yet. Clone it and import from the folder:
+Not on npm yet. Install straight from GitHub:
 
 ```sh
-git clone https://github.com/MaybeSomeone-arc18/tripwire-guardrails.git
-cd tripwire-guardrails
-npm test
+npm install github:MaybeSomeone-arc18/tripwire-guardrails
+```
+
+Works with `import` and `require`, Node 20 and 22 (both tested). No build step on your side; the CommonJS files are committed in `dist/`. Or just try it from the command line:
+
+```sh
+npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructions"   # prints the verdict, exit code 1
 ```
 
 ## Use
 
 ```js
-import { createGuard } from "./src/index.js";
+import { createGuard } from "tripwire-guardrails";   // or: const { createGuard } = require("tripwire-guardrails")
 
 const guard = createGuard();
 
@@ -80,13 +84,55 @@ createGuard({
 });
 ```
 
-Two ready-made policies are in `policies/`. Adding your own rule means adding an object to the arrays in `src/rules.js`.
+Two ready-made policies are in `policies/` (`import p from "tripwire-guardrails/policies/support-bot.json" with { type: "json" }`).
+
+### Your own rules
+
+```js
+createGuard({
+  rules: [
+    { id: "acme.internal-host", category: "secret", severity: 3, pattern: /\b[\w-]+\.corp\.acme\.internal\b/i,
+      reason: "Internal hostname.", direction: "both" },   // "input" (default), "output" or "both"
+  ],
+});
+```
+
+Rules are checked when the guard is created (bad severity or a non-RegExp throws right away). A custom `check(match)` function that throws counts as a match, so a bug blocks instead of letting text through. See `examples/custom-rules.js`.
+
+### Inputs that are not text
+
+`checkInput` and `checkOutput` block anything that is not a string (`undefined`, `null`, objects, numbers) with category `invalid_input`. A missing field or `{"message": {"$ne": 1}}` does not turn into an empty string that passes.
+
+### Frameworks
+
+All of these were run for real while writing this (see "What was tested"):
+
+| Where | How | File |
+| --- | --- | --- |
+| Express | `app.post("/chat", tripwire(guard), handler)` from `tripwire-guardrails/express`. Checks `req.body.message`, checks `res.json({ reply })` on the way out. A POST with the field missing is blocked. | `examples/express.js` |
+| Fastify | `preHandler` hook calling `guard.checkInput` | `examples/fastify.js` |
+| Next.js route handler | plain `Request` / `Response`, no Node-only imports | `examples/next-route.js` |
+| Streaming replies | `createStreamGuard(guard)` from `tripwire-guardrails/stream` holds text back so a secret split across chunks is still seen | `examples/stream.js` |
+| Python, Go, anything else | `tripwire-server` is a small local HTTP server: `POST /check {"text": "...", "direction": "input"}` | `examples/python/check.py` |
+| Browser | the rules are plain JS with no Node imports (the demo page runs them in the page) | `demo/` |
+
+```sh
+npx tripwire-server --port 8787          # binds 127.0.0.1; add --policy file.json
+```
+
+### Failure behaviour
+
+- Rules never fail open: a throwing custom rule, a non-string input, a middleware error and a judge error all end in a block.
+- Over `maxInputChars` (default 8000) the input is blocked without being scanned.
+- The middleware answers 400 on a block. Pass `onBlock(req, res, verdict)` to change that.
+- The Python helper raises when the server is not reachable. Treat that as "do not send", not as allowed.
 
 ### CLI
 
 ```sh
-echo "ignore all previous instructions" | node bin/tripwire.js     # exit code 1, JSON on stdout
-echo "token ghp_..." | node bin/tripwire.js --output
+tripwire "ignore all previous instructions"              # text as an argument, exit code 1, JSON on stdout
+echo "token ghp_..." | tripwire --output --policy policies/support-bot.json
+tripwire --help                                           # exit codes: 0 allowed, 1 blocked, 2 usage error
 ```
 
 ### Demo
@@ -95,15 +141,15 @@ Live: https://maybesomeone-arc18.github.io/tripwire-guardrails/demo/standalone.h
 
 `demo/standalone.html` is one file. Open it in a browser. The rules run locally and send nothing. An optional panel lets you paste your own AI Studio key and ask Gemma about the same text; that sends the text to Google and the key goes in a request header. Nothing is stored. Rebuild the file with `node scripts/build-standalone.mjs`.
 
-TypeScript types ship as `src/index.d.ts` and `src/judge.d.ts` (hand-written, not compiled from the source).
+TypeScript types ship as `src/*.d.ts` (hand-written, not compiled from the source). A strict `tsc` check of ESM and CommonJS projects importing every entry point passes.
 
 ## Gemma as a judge (optional)
 
 Rules only catch patterns they know. For the gray zone, or for everything, ask an open model.
 
 ```js
-import { createGuard } from "./src/index.js";
-import { createJudge, checkWithJudge } from "./src/judge.js";
+import { createGuard } from "tripwire-guardrails";
+import { createJudge, checkWithJudge } from "tripwire-guardrails/judge";
 
 const guard = createGuard();
 const judge = createJudge({ apiKey: process.env.GEMINI_API_KEY }); // default model: gemma-4-26b-a4b-it
@@ -150,6 +196,8 @@ Read the first row as "the rules do what I built them to do on cases I knew abou
 
 ### Everything else
 
+- Adopter checks (`test/adopter.test.js`, run on Node 20.20 and 22): custom rules, non-string input, middleware with fake req/res, stream split secrets, CLI flags, a real `tripwire-server` round trip, `require()` through `dist/`, and a timing test that feeds 100,000 characters of adversarial text (`sk-sk-...`, `a.a.a.`) to every check. Two rules were quadratic on that text (3.5 s and 4.7 s per 100 KB before the fix, about 50 ms after).
+- By hand from a packed tarball in a clean folder: Express 5 and Fastify servers answering real HTTP with blocked, allowed, missing-field and object-valued bodies; the Next.js route handler called with a real `Request`; the Python example against the server; `tsc --strict` on ESM and CommonJS projects.
 - Judge logic against a fake `fetch`: parsing, fail-closed paths, retries, header use, thought parts, `always` mode.
 - Live Gemma, once, by hand, before the normalization work: 8 hand-written texts (4 benign, 4 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. On those 4 hostile texts the rules at that time blocked none.
 - Live Gemma over the held-out set (`gemma-4-26b-a4b-it`, AI Studio free tier, `always` mode, run once by hand from a browser page, retries 3, 2.5 s between calls; the harness is not in the repo). Every text the rules allowed went to the judge: 14 hostile and 24 benign in the main run, plus one more hostile text after a later rule fix (see the notes below the table).
@@ -161,7 +209,9 @@ Read the first row as "the rules do what I built them to do on cases I knew abou
 - The judge is a model and can be wrong or be targeted itself. Its prompt marks the text as data, which helps and does not make it immune.
 - PII patterns are shape checks. Aadhaar and card numbers are checksum-checked, email and phone are not verified, names and addresses are not detected.
 - Redaction replaces matched spans only.
-- No streaming support, no per-user policies, no logging. Not benchmarked for speed beyond "regexes on short strings".
+- Streaming: text already sent to the client cannot be taken back, and a secret longer than the hold-back window (256 characters by default) can be missed. No per-user policies, no logging.
+- Speed (measured on one machine, Node 22): about 0.05 ms for a one-sentence input and 26 ms for a 100,000-character input. Large inputs are blocked by `maxInputChars` before scanning anyway.
+- Not on npm yet, and `tripwire-guardrails` is unclaimed on the registry as of today (npm view returned 404). Publishing needs an npm account.
 
 ## License
 
