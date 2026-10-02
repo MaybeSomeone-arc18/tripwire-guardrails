@@ -76,6 +76,24 @@ export const PARAPHRASE_RULES = [
   { id: "inj.obey-fully", category: "prompt_injection", severity: 2,
     pattern: /\byou must (now )?obey\b|\bobey the user (fully|completely)\b/i,
     reason: "Demands unconditional obedience." },
+  { id: "inj.forget-everything", category: "prompt_injection", severity: 3,
+    pattern: /\b(forget|disregard|ignore|erase|drop|leave|remove|abandon)\b(?: about)?[^.\n]{0,30}\b(everything|all|any)\b[^.\n]{0,40}\b(before|previous|prior|preceding|above|earlier|assignments?|tasks?|instructions?|orders?|information|context|you know)\b/i,
+    reason: "Tells the model to drop everything it was given earlier." },
+  { id: "inj.ignore-above", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignore|disregard|forget)\s+(the\s+)?(above|preceding|foregoing)\b/i,
+    reason: "Tells the model to ignore the text above." },
+  { id: "inj.new-task", category: "prompt_injection", severity: 2,
+    pattern: /\b(now )?(new|further) (tasks?|instructions?|orders?) (now )?(follow|come|comes)\b|\b(focus|concentrate) on (your|the) new task\b|\bstart (over )?with a new task\b/i,
+    reason: "Announces a new task to replace the old one." },
+  { id: "inj.print-above", category: "prompt_injection", severity: 3,
+    pattern: /\b(what|show|print|display|repeat|spell ?-? ?check)\b[^.\n]{0,40}\b(written|text|prompt|said)\b[^.\n]{0,20}\b(above|before this|at the beginning)\b|\b(spell ?-? ?check|display|print)\b[^.\n]{0,20}\b(this|the|your) prompt\b/i,
+    reason: "Asks the model to repeat or reveal the text above it." },
+  { id: "inj.instructions-now", category: "prompt_injection", severity: 3,
+    pattern: /\byour (instructions|task|job|orders) (are|is) now\b|\b(ignore|disregard) your (instructions|rules|guidelines)\b|\b(change|replace|update) your (instructions|rules|guidelines) to\b/i,
+    reason: "Replaces the model's instructions." },
+  { id: "inj.ignore-context", category: "prompt_injection", severity: 2,
+    pattern: /\bignore (all )?(the )?(provided |given )?(context|documents?|articles?)\b|\banswer by your own knowledge and not by (the )?(articles?|documents?|context)\b|\b(don'?n?t|do not) answer (the question )?according to the (provided )?(documents?|articles?|context)\b/i,
+    reason: "Tells a retrieval-based app to ignore the documents it was given." },
 ];
 
 // Other languages. Each pattern pairs an ignore-verb with an instructions-noun in the same language.
@@ -98,6 +116,9 @@ export const MULTILINGUAL_RULES = [
   { id: "inj.zh", category: "prompt_injection", severity: 3,
     pattern: /忽略[^\n。]{0,12}(指令|提示|规则)|(显示|透露|输出)[^\n。]{0,10}(系统提示|系统提示词)/u,
     reason: "Instruction override or prompt extraction (Chinese)." },
+  { id: "inj.forget-multi", category: "prompt_injection", severity: 3,
+    pattern: /\b(vergiss|vergessen sie)\s+(alles|alle)\b|\bolvid[ae]\s+todo\b|\bzaboravi\s+sve\b|\boubliez?\s+(tout|toutes)\b|\bзабудьте\s+(все|всё)\b|\babweichend zu vorherigen\b/iu,
+    reason: "Tells the model to forget everything (German, Spanish, Croatian, French)." },
 ];
 
 export const SECRET_RULES = [
