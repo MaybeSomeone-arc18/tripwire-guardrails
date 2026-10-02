@@ -78,11 +78,6 @@ textarea:focus-visible{outline:none}
 #judgeresult:empty{display:none}
 #judgeresult .verdict strong{font-size:1.1rem}
 
-.facts{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:40px 0}
-.facts div{padding:20px 16px;border-right:1px solid var(--line)}
-.facts div:last-child{border-right:0}
-.facts b{display:block;font-size:clamp(1.6rem,4vw,2.4rem);letter-spacing:-.04em;line-height:1.1}
-.facts span{color:var(--mut);font-size:.88rem}
 
 .block{padding:36px 0;border-top:1px solid var(--line)}
 .block:first-of-type{border-top:0}
@@ -120,10 +115,7 @@ h3{font-size:1rem;margin:0 0 4px;letter-spacing:-.01em}
 
 @media (max-width:720px){
   .top nav a:not(:last-child){display:none}
-  .facts{grid-template-columns:repeat(2,1fr)}
-  .facts div:nth-child(2){border-right:0}
-  .facts div:nth-child(-n+2){border-bottom:1px solid var(--line)}
-  .grid{grid-template-columns:1fr}
+        .grid{grid-template-columns:1fr}
   .wire{margin-left:-18px;margin-right:-18px}
 }
 @media (prefers-reduced-motion:reduce){
