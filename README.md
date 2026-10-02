@@ -91,7 +91,11 @@ echo "token ghp_..." | node bin/tripwire.js --output
 
 ### Demo
 
-`demo/standalone.html` is one file. Open it in a browser. It runs the rules locally and sends nothing. Rebuild it with `node scripts/build-standalone.mjs`.
+Live: https://maybesomeone-arc18.github.io/tripwire-guardrails/demo/standalone.html (GitHub Pages).
+
+`demo/standalone.html` is one file. Open it in a browser. The rules run locally and send nothing. An optional panel lets you paste your own AI Studio key and ask Gemma about the same text; that sends the text to Google and the key goes in a request header. Nothing is stored. Rebuild the file with `node scripts/build-standalone.mjs`.
+
+TypeScript types ship as `src/index.d.ts` and `src/judge.d.ts` (hand-written, not compiled from the source).
 
 ## Gemma as a judge (optional)
 
