@@ -1,0 +1,28 @@
+{
+  "name": "tripwire-guardrails",
+  "version": "0.1.0",
+  "description": "Small drop-in guardrails for LLM apps: rule checks first, optional open-model judge (Gemma) for the gray zone.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./judge": "./src/judge.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT",
+  "bin": {
+    "tripwire": "bin/tripwire.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "policies",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
