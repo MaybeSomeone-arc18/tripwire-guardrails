@@ -5,8 +5,14 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js",
-    "./judge": "./src/judge.js"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./judge": {
+      "types": "./src/judge.d.ts",
+      "default": "./src/judge.js"
+    }
   },
   "scripts": {
     "test": "node --test test/*.test.js",
@@ -25,5 +31,6 @@
   ],
   "engines": {
     "node": ">=20"
-  }
+  },
+  "types": "./src/index.d.ts"
 }
