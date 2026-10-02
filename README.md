@@ -170,4 +170,5 @@ MIT
 ## Credits and timing
 
 - Written during the Hacktoberfest Weekend Challenge window (Oct 2-5, 2026) for that challenge. Any commit after the Oct 5, 2026 12:29 PM IST deadline will be listed here.
+- The Demo fonts: Schibsted Grotesk and JetBrains Mono (SIL Open Font License 1.1), Latin subsets embedded in the page; see `demo/FONTS-LICENSE.txt`.
 - The Aadhaar check uses the public Verhoeff checksum algorithm and the card check uses the Luhn algorithm. Both are standard published algorithms, implemented here from their descriptions. No other third-party code is included.
