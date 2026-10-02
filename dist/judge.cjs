@@ -35,22 +35,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function createJudge({
   apiKey,
   model = "gemma-4-26b-a4b-it",
-  provider = "gemini",   // "gemini" (Google AI Studio, tested) or "ollama" (self-hosted, UNTESTED: never run against a real server)
-  endpoint,              // base URL override. gemini default: generativelanguage.googleapis.com; ollama default: http://localhost:11434
+  provider = "gemini",   // "gemini" (Google AI Studio), "openai" (any OpenAI-compatible server: llama.cpp, LM Studio, vLLM, Ollama /v1; tested with llama.cpp) or "ollama" (native Ollama API, UNTESTED)
+  endpoint,              // base URL override. gemini default: generativelanguage.googleapis.com; openai default: http://localhost:8080; ollama default: http://localhost:11434
   timeoutMs = 15000,
   retries = 2,        // extra attempts after the first, for 429/5xx, timeouts and network errors
   backoffMs = 500,    // doubles each retry
   fetchImpl = globalThis.fetch,
   sleepImpl = sleep,
 } = {}) {
-  if (provider !== "gemini" && provider !== "ollama") throw new Error(`createJudge: unknown provider "${provider}"`);
+  if (!["gemini", "ollama", "openai"].includes(provider)) throw new Error(`createJudge: unknown provider "${provider}"`);
   if (provider === "gemini" && !apiKey) throw new Error("createJudge: apiKey is required");
 
   async function attempt(body) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const res = provider === "ollama"
+      const res = provider === "openai"
+        ? await fetchImpl(`${endpoint ?? "http://localhost:8080"}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "content-type": "application/json", ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) },
+            body: JSON.stringify({ model, temperature: 0, max_tokens: 200, response_format: { type: "json_object" }, messages: [{ role: "user", content: body.prompt }] }),
+            signal: ctl.signal,
+          })
+        : provider === "ollama"
         ? await fetchImpl(`${endpoint ?? "http://localhost:11434"}/api/chat`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -65,7 +72,7 @@ function createJudge({
           });
       if (!res.ok) return { retry: RETRYABLE.has(res.status), result: { verdict: "block", category: "judge_error", reason: `Judge HTTP ${res.status}, failing closed.` } };
       const data = await res.json();
-      return { retry: false, result: parseJudgeReply(provider === "ollama" ? data?.message?.content : extractAnswer(data)) };
+      return { retry: false, result: parseJudgeReply(provider === "openai" ? data?.choices?.[0]?.message?.content : provider === "ollama" ? data?.message?.content : extractAnswer(data)) };
     } catch (err) {
       return { retry: true, result: { verdict: "block", category: "judge_error", reason: `Judge call failed (${err.name}: ${String(err.message).slice(0, 80)}), failing closed.` } };
     } finally {
