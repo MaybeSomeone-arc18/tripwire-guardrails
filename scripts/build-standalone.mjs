@@ -1,7 +1,7 @@
 // Inlines the demo and the library into one HTML file you can open with a double click.
 import { readFileSync, writeFileSync } from "node:fs";
 const strip = (s) => s.replace(/^import .*$/gm, "").replace(/^export \{[^}]*\};?$/gm, "").replace(/^export /gm, "");
-const lib = ["src/normalize.js", "src/rules.js", "src/index.js"].map((f) => strip(readFileSync(f, "utf8"))).join("\n");
+const lib = ["src/normalize.js", "src/rules.js", "src/index.js", "src/judge.js"].map((f) => strip(readFileSync(f, "utf8"))).join("\n");
 const css = readFileSync("demo/style.css", "utf8");
 const app = readFileSync("demo/app.js", "utf8");
 let html = readFileSync("demo/index.html", "utf8");
