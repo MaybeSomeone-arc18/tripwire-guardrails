@@ -14,11 +14,28 @@ const DEFAULT_POLICY = {
   redactWith: "[REDACTED]",
   // Also scan unicode-folded, de-spaced, leetspeak, ROT13 and base64/hex-decoded variants of the input.
   scanVariants: true,
+  // Your own rules: { id, category, severity (1-3), pattern (RegExp), reason, direction?: "input" | "output" | "both" (default "input"), check?(match) }.
+  // They run on top of the built-in ones. Rules in the "secret" or "pii" category are also redacted in output.
+  rules: [],
 };
+
+function validateRule(r, i) {
+  const where = `createGuard: rules[${i}]`;
+  if (!r || typeof r !== "object") throw new TypeError(`${where} must be an object`);
+  if (typeof r.id !== "string" || !r.id) throw new TypeError(`${where}.id must be a non-empty string`);
+  if (typeof r.category !== "string" || !r.category) throw new TypeError(`${where}.category must be a non-empty string`);
+  if (!(r.pattern instanceof RegExp)) throw new TypeError(`${where}.pattern must be a RegExp`);
+  if (![1, 2, 3].includes(r.severity)) throw new TypeError(`${where}.severity must be 1, 2 or 3`);
+  if (r.direction !== undefined && !["input", "output", "both"].includes(r.direction)) throw new TypeError(`${where}.direction must be "input", "output" or "both"`);
+  return { reason: "Matched a custom rule.", direction: "input", ...r };
+}
 
 export function createGuard(policy = {}) {
   const p = { ...DEFAULT_POLICY, ...policy };
   const skip = new Set(p.ignoreCategories);
+  const custom = (p.rules ?? []).map(validateRule);
+  const customIn = custom.filter((r) => r.direction !== "output");
+  const customOut = custom.filter((r) => r.direction !== "input");
 
   function run(rules, text) {
     const findings = [];
@@ -26,7 +43,11 @@ export function createGuard(policy = {}) {
       if (skip.has(rule.category)) continue;
       const re = new RegExp(rule.pattern.source, rule.pattern.flags.replace("g", "") + "g");
       for (const m of text.matchAll(re)) {
-        if (rule.check && !rule.check(m[0])) continue;
+        if (rule.check) {
+          let ok;
+          try { ok = rule.check(m[0]); } catch { ok = true; } // a broken custom check must not let text through
+          if (!ok) continue;
+        }
         findings.push({
           id: rule.id,
           category: rule.category,
@@ -66,21 +87,29 @@ export function createGuard(policy = {}) {
     return out;
   }
 
+  // Anything that is not a string (undefined, null, an object, a number) is blocked, not coerced.
+  // Coercing would turn a missing field into "" or an object into "[object Object]" and wave it through.
+  function invalid(text, what) {
+    return { allowed: false, severity: 3, categories: ["invalid_input"], needsJudge: false, findings: [{ id: "in.not-a-string", category: "invalid_input", severity: 3, reason: `${what} must be a string, got ${text === null ? "null" : typeof text}.`, snippet: "" }] };
+  }
+
   function checkInput(text) {
-    const t = String(text ?? "");
-    const findings = [...run(SECRET_RULES, t), ...run(PII_RULES, t)];
+    if (typeof text !== "string") return invalid(text, "Input");
+    const t = text;
+    // Over the size limit: block without scanning. Scanning a huge text first would only burn CPU.
+    if (t.length > p.maxInputChars && !skip.has("size")) {
+      return verdict([{ id: "in.too-long", category: "size", severity: p.blockAt, reason: `Input is over ${p.maxInputChars} characters.`, start: 0, end: 0 }], t);
+    }
+    const findings = [...run(SECRET_RULES, t), ...run(PII_RULES, t), ...run(customIn.filter((r) => r.category === "secret" || r.category === "pii"), t)];
     // Manipulation rules also run on cleaned-up and decoded variants of the text.
     const seen = new Set();
     for (const v of variants(t)) {
       if (p.scanVariants === false && v.via !== "original") continue;
-      for (const f of run([...INPUT_RULES, ...PARAPHRASE_RULES, ...MULTILINGUAL_RULES], v.text)) {
+      for (const f of run([...INPUT_RULES, ...PARAPHRASE_RULES, ...MULTILINGUAL_RULES, ...customIn.filter((r) => r.category !== "secret" && r.category !== "pii")], v.text)) {
         if (seen.has(f.id)) continue;
         seen.add(f.id);
         findings.push(v.via === "original" ? f : { ...f, via: v.via, start: 0, end: 0, snippet: v.text.slice(f.start, f.end) });
       }
-    }
-    if (t.length > p.maxInputChars) {
-      findings.push({ id: "in.too-long", category: "size", severity: p.blockAt, reason: `Input is over ${p.maxInputChars} characters.`, start: 0, end: 0 });
     }
     if (p.topics && !skip.has("off_topic")) {
       const lower = t.toLowerCase();
@@ -92,8 +121,9 @@ export function createGuard(policy = {}) {
   }
 
   function checkOutput(text) {
-    const t = String(text ?? "");
-    const findings = run(OUTPUT_RULES, t);
+    if (typeof text !== "string") return { ...invalid(text, "Output"), redacted: "" };
+    const t = text;
+    const findings = run([...OUTPUT_RULES, ...customOut], t);
     const v = verdict(findings, t);
     v.redacted = redact(t, findings);
     return v;
