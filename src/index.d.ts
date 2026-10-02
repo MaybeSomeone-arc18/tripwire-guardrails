@@ -7,6 +7,17 @@ export interface Policy {
   maxInputChars?: number;
   redactWith?: string;
   scanVariants?: boolean;
+  rules?: CustomRule[];
+}
+
+export interface CustomRule {
+  id: string;
+  category: Category;
+  severity: 1 | 2 | 3;
+  pattern: RegExp;
+  reason?: string;
+  direction?: "input" | "output" | "both";
+  check?(match: string): boolean;
 }
 
 export interface Finding {
