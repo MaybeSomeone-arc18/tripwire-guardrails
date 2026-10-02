@@ -31,12 +31,73 @@ export const INPUT_RULES = [
     reason: "Contains chat-template markers that look like a forged system turn.",
   },
   {
+    id: "inj.exfil-template",
+    category: "prompt_injection",
+    severity: 3,
+    pattern: /!\[[^\]]*\]\(https?:\/\/[^)\s]*(\{\{|%7B%7B|\$\{)[^)]*\)/i,
+    reason: "Markdown image whose URL carries a template placeholder, a classic data-leak trick.",
+  },
+  {
     id: "inj.exfil-link",
     category: "prompt_injection",
     severity: 2,
     pattern: /!\[[^\]]*\]\(https?:\/\/[^)\s]*[?&][^)\s]*(\{|%7B|data=|q=)[^)]*\)/i,
     reason: "Markdown image with a query string can leak data when rendered.",
   },
+];
+
+
+// Paraphrases, personas, prompt-extraction and indirect injection (English).
+export const PARAPHRASE_RULES = [
+  { id: "inj.persona-no-rules", category: "prompt_injection", severity: 3,
+    pattern: /\b(ai|assistant|model|bot|chatbot|you)\b[^.\n]{0,40}\b(no rules|without (any )?(restrictions?|limits?|filters?|guardrails?)|no (restrictions?|limits|filters))\b/i,
+    reason: "Asks for an assistant with no rules or restrictions." },
+  { id: "inj.forget-told", category: "prompt_injection", severity: 3,
+    pattern: /\bforget what (the|your) (developer|creator|operator|owner|system) (told|said|gave)\b|\b(disregard|forget|drop|stop following)\b[^.\n]{0,40}\b(told|guidelines?|developer|setup|configuration|instructions?|rules?)\b[^.\n]{0,40}\b(before|earlier|previously|for this|and (reply|answer|say|tell|print|show|output)|new)\b/i,
+    reason: "Tries to drop earlier guidance." },
+  { id: "inj.rules-void", category: "prompt_injection", severity: 3,
+    pattern: /\b(your|all|the)\s+(\w+\s+)?(rules?|guidelines?|guidance|instructions?)\s+(are|is)?\s*(now\s+)?(void|null|cancelled|canceled|no longer (apply|applies|valid))\b|\bno longer applies?\b[^.\n]{0,30}\b(guidance|rules?|instructions?)\b|\b(guidance|rules?|instructions?)\b[^.\n]{0,30}\bno longer apply\b/i,
+    reason: "Declares the earlier rules void." },
+  { id: "inj.clean-slate", category: "prompt_injection", severity: 2,
+    pattern: /\b(start over|reset)\b[^.\n]{0,30}\b(clean slate|from scratch|fresh)\b[^.\n]{0,80}\b(earlier|previous|prior|your)\b/i,
+    reason: "Frames a reset of the assistant's earlier setup." },
+  { id: "inj.new-orders", category: "prompt_injection", severity: 2,
+    pattern: /\bnew (orders|instructions|policy|rules)\s*:/i,
+    reason: "Announces replacement orders." },
+  { id: "inj.extract-config", category: "prompt_injection", severity: 3,
+    pattern: /\b(exact words|verbatim|word for word|in full|quote|repeat back|write out|list every)\b[^.\n]{0,80}\b(message|prompt|instructions?|rules?|guidelines?|setup|configuration)\b[^.\n]{0,40}\b(configured|gave|given|told|set up|you had|you were|you received|original)\b|\b(configured|gave|given|told) you\b[^.\n]{0,60}\b(exact words|verbatim|quote|in full)\b|\b(original|initial|hidden|developer)\s+(instructions?|setup|prompt|message)\b[^.\n]{0,30}\b(word for word|verbatim|in full)\b|\bwhat were the (exact )?words\b[^.\n]{0,60}\bconfigured you\b/i,
+    reason: "Tries to extract the assistant's hidden configuration." },
+  { id: "inj.note-to-assistant", category: "prompt_injection", severity: 3,
+    pattern: /\b(note|message|instruction)s? (to|for) (the )?(ai|assistant|model|llm|agent)\b[^.\n]{0,60}\b(skip|ignore|instead|send|forward|do not|don't)\b/i,
+    reason: "Text addressed to the assistant inside content (indirect injection)." },
+  { id: "inj.send-data-out", category: "prompt_injection", severity: 3,
+    pattern: /\b(send|forward|email|post|upload)\b[^.\n]{0,40}\b(saved notes|chat history|conversation|user'?s? (data|notes|messages)|memory|system prompt)\b[^.\n]{0,40}\b(to|at)\b[^.\n]{0,20}(https?:\/\/|[\w.+-]+@[\w-]+\.|address below)/i,
+    reason: "Asks the assistant to send private data to an outside address." },
+  { id: "inj.obey-fully", category: "prompt_injection", severity: 2,
+    pattern: /\byou must (now )?obey\b|\bobey the user (fully|completely)\b/i,
+    reason: "Demands unconditional obedience." },
+];
+
+// Other languages. Each pattern pairs an ignore-verb with an instructions-noun in the same language.
+export const MULTILINGUAL_RULES = [
+  { id: "inj.es", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignora|olvida|descarta)\b[^.\n]{0,40}\b(instrucciones|reglas)\b|\b(muestra|revela|imprime)\b[^.\n]{0,30}\b(prompt del sistema|instrucciones ocultas)\b/iu,
+    reason: "Instruction override or prompt extraction (Spanish)." },
+  { id: "inj.fr", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignore|oublie|ignorez)\b[^.\n]{0,40}\b(instructions|règles)\b|\b(révèle|montre|affiche)\b[^.\n]{0,30}\b(prompt système|instructions cachées)\b/iu,
+    reason: "Instruction override or prompt extraction (French)." },
+  { id: "inj.de", category: "prompt_injection", severity: 3,
+    pattern: /\b(ignoriere|vergiss|missachte)\b[^.\n]{0,40}\b(anweisungen|regeln)\b|\b(zeige|verrate|gib)\b[^.\n]{0,30}\b(system-?prompt)\b/iu,
+    reason: "Instruction override or prompt extraction (German)." },
+  { id: "inj.hi-deva", category: "prompt_injection", severity: 3,
+    pattern: /(निर्देश|नियम)[^\n।.]{0,30}(अनदेखा|नज़रअंदाज़|नजरअंदाज|भूल)|(अनदेखा|नज़रअंदाज़|नजरअंदाज|भूल)[^\n।.]{0,30}(निर्देश|नियम)|सिस्टम\s*प्रॉम्प्ट[^\n।.]{0,20}(दिखा|बता|प्रिंट)/u,
+    reason: "Instruction override or prompt extraction (Hindi)." },
+  { id: "inj.hinglish", category: "prompt_injection", severity: 3,
+    pattern: /\b(instructions?|rules?|niyam)\b[^.\n]{0,30}\b(ignore|bhool|bhul|ignore karo)\b|\b(ignore|bhool|bhul)\s*(karo|jao|kar do)?\b[^.\n]{0,30}\b(instructions?|rules?)\b|\bsystem prompt\b[^.\n]{0,20}\b(batao|bata do|dikhao|print karo)\b|\bhidden instructions?\b[^.\n]{0,40}\b(print|batao|dikhao)\b/i,
+    reason: "Instruction override or prompt extraction (Hinglish)." },
+  { id: "inj.zh", category: "prompt_injection", severity: 3,
+    pattern: /忽略[^\n。]{0,12}(指令|提示|规则)|(显示|透露|输出)[^\n。]{0,10}(系统提示|系统提示词)/u,
+    reason: "Instruction override or prompt extraction (Chinese)." },
 ];
 
 export const SECRET_RULES = [
