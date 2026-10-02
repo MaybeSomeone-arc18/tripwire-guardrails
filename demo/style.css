@@ -20,3 +20,6 @@ label { color: var(--muted); font-size: 14px; }
 small { color: var(--muted); word-break: break-all; }
 footer { margin-top: 32px; color: var(--muted); font-size: 14px; }
 code { font-family: ui-monospace,Menlo,monospace; font-size: 13px; }
+
+details{margin-top:1rem}summary{cursor:pointer}.note{font-size:.85rem;opacity:.8}#judgeresult{margin-top:.5rem;padding:.5rem;border-radius:6px}#judgeresult:empty{display:none}#key{flex:1;min-width:12rem}
+#judgeresult.ok{border:1px solid var(--line);border-left:5px solid var(--ok)}#judgeresult.bad{border:1px solid var(--line);border-left:5px solid var(--bad)}
