@@ -2,12 +2,10 @@
 
 Small guardrails for LLM apps. Check what goes into your model and what comes out, with plain rules first and an open-weight model (Gemma) as an optional second opinion.
 
-- Zero dependencies. Node 20+. Plain ES modules, no build step.
+- Zero dependencies. Node 20+. Works with `import` and `require`.
 - Rules are data. Copy one, change it, delete it.
 - Fails closed. If the judge call errors, times out or returns junk, the text is blocked.
 - Runs offline in rules-only mode. Nothing is sent anywhere unless you create a judge.
-
-I built it because I kept having the same argument while building AI projects: trust the model to behave, or put a separate layer of checks around it. This is the separate layer, kept small enough to read in one sitting.
 
 ## Install
 
@@ -139,7 +137,7 @@ tripwire --help                                           # exit codes: 0 allowe
 
 Live: https://maybesomeone-arc18.github.io/tripwire-guardrails/demo/standalone.html (GitHub Pages).
 
-`demo/standalone.html` is one file. Open it in a browser. The rules run locally and send nothing. An optional panel lets you paste your own AI Studio key and ask Gemma about the same text; that sends the text to Google and the key goes in a request header. Nothing is stored. Rebuild the file with `node scripts/build-standalone.mjs`.
+`demo/standalone.html` is one file. The rules run in the page and send nothing. The optional Gemma panel sends the text to Google with your own AI Studio key, which is never stored. Rebuild with `node scripts/build-standalone.mjs`.
 
 TypeScript types ship as `src/*.d.ts` (hand-written, not compiled from the source). A strict `tsc` check of ESM and CommonJS projects importing every entry point passes.
 
@@ -199,7 +197,6 @@ Read the first row as "the rules do what I built them to do on cases I knew abou
 - Adopter checks (`test/adopter.test.js`, run on Node 20.20 and 22): custom rules, non-string input, middleware with fake req/res, stream split secrets, CLI flags, a real `tripwire-server` round trip, `require()` through `dist/`, and a timing test that feeds 100,000 characters of adversarial text (`sk-sk-...`, `a.a.a.`) to every check. Two rules were quadratic on that text (3.5 s and 4.7 s per 100 KB before the fix, about 50 ms after).
 - By hand from a packed tarball in a clean folder: Express 5 and Fastify servers answering real HTTP with blocked, allowed, missing-field and object-valued bodies; the Next.js route handler called with a real `Request`; the Python example against the server; `tsc --strict` on ESM and CommonJS projects.
 - Judge logic against a fake `fetch`: parsing, fail-closed paths, retries, header use, thought parts, `always` mode.
-- Live Gemma, once, by hand, before the normalization work: 8 hand-written texts (4 benign, 4 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. On those 4 hostile texts the rules at that time blocked none.
 - Live Gemma over the held-out set (`gemma-4-26b-a4b-it`, AI Studio free tier, `always` mode, run once by hand from a browser page, retries 3, 2.5 s between calls; the harness is not in the repo). Every text the rules allowed went to the judge: 14 hostile and 24 benign in the main run, plus one more hostile text after a later rule fix (see the notes below the table).
 
 ## What this does not do
