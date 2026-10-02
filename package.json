@@ -9,7 +9,8 @@
     "./judge": "./src/judge.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "eval": "node eval/run.mjs && node eval/run-heldout.mjs"
   },
   "license": "MIT",
   "bin": {
