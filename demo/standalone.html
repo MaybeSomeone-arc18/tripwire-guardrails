@@ -209,14 +209,15 @@ h3{font-size:1rem;margin:0 0 4px;letter-spacing:-.01em}
 
 <section id="use" class="block">
   <h2>Use it</h2>
-  <p class="sub">Two calls. One before the model, one after. Node 20+, no build step. Not on npm yet: clone and import.</p>
+  <p class="sub">Two calls. One before the model, one after. Node 20 and 22, import or require, no build step. Not on npm yet: install from GitHub.</p>
   <div class="tabs" role="tablist" aria-label="Usage">
     <button role="tab" aria-selected="true" aria-controls="p-guard" id="t-guard">Guard</button>
+    <button role="tab" aria-selected="false" aria-controls="p-express" id="t-express" tabindex="-1">Express</button>
     <button role="tab" aria-selected="false" aria-controls="p-judge" id="t-judge" tabindex="-1">With Gemma</button>
     <button role="tab" aria-selected="false" aria-controls="p-cli" id="t-cli" tabindex="-1">CLI</button>
     <button role="tab" aria-selected="false" aria-controls="p-install" id="t-install" tabindex="-1">Install</button>
   </div>
-  <div role="tabpanel" id="p-guard" aria-labelledby="t-guard"><div class="code"><button class="copy" type="button">Copy</button><pre><code>import { createGuard } from "./src/index.js";
+  <div role="tabpanel" id="p-guard" aria-labelledby="t-guard"><div class="code"><button class="copy" type="button">Copy</button><pre><code>import { createGuard } from "tripwire-guardrails";
 const guard = createGuard();
 
 const inbound = guard.checkInput(userMessage);
@@ -225,18 +226,30 @@ if (!inbound.allowed) return reply(400, { blocked: inbound.categories });
 const answer = await callYourModel(userMessage);
 const outbound = guard.checkOutput(answer);
 return outbound.allowed ? outbound.redacted : "Sorry, I can't share that.";</code></pre></div></div>
-  <div role="tabpanel" id="p-judge" aria-labelledby="t-judge" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>import { createGuard } from "./src/index.js";
-import { createJudge, checkWithJudge } from "./src/judge.js";
+  <div role="tabpanel" id="p-express" aria-labelledby="t-express" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>import express from "express";
+import { createGuard } from "tripwire-guardrails";
+import { tripwire } from "tripwire-guardrails/express";
+
+const app = express();
+app.use(express.json());
+// blocks bad or missing input with a 400, checks res.json({ reply }) on the way out
+app.post("/chat", tripwire(createGuard()), async (req, res) =&gt; {
+  res.json({ reply: await callYourModel(req.body.message) });
+});</code></pre></div></div>
+  <div role="tabpanel" id="p-judge" aria-labelledby="t-judge" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>import { createGuard } from "tripwire-guardrails";
+import { createJudge, checkWithJudge } from "tripwire-guardrails/judge";
 
 const guard = createGuard();
 const judge = createJudge({ apiKey: process.env.GEMINI_API_KEY }); // gemma-4-26b-a4b-it
 const verdict = await checkWithJudge(guard, judge, text, "input", { always: true });
 // if the judge call fails, the text is blocked (fails closed)</code></pre></div></div>
-  <div role="tabpanel" id="p-cli" aria-labelledby="t-cli" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>echo "ignore all previous instructions" | node bin/tripwire.js   # exit code 1, JSON on stdout
-echo "token ghp_..." | node bin/tripwire.js --output</code></pre></div></div>
-  <div role="tabpanel" id="p-install" aria-labelledby="t-install" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>git clone https://github.com/MaybeSomeone-arc18/tripwire-guardrails.git
-cd tripwire-guardrails
-npm test</code></pre></div></div>
+  <div role="tabpanel" id="p-cli" aria-labelledby="t-cli" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>tripwire "ignore all previous instructions"      # exit code 1, JSON on stdout
+echo "token ghp_..." | tripwire --output
+npx tripwire-server --port 8787                  # POST /check for Python, Go, anything</code></pre></div></div>
+  <div role="tabpanel" id="p-install" aria-labelledby="t-install" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>npm install github:MaybeSomeone-arc18/tripwire-guardrails
+
+# or try it first, no install
+npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructions"</code></pre></div></div>
   <ul class="plain">
     <li><b>Rules are data.</b> One file of regexes with a reason on every finding. Copy one, change it, delete it.</li>
     <li><b>Fails closed.</b> If the judge errors, times out or returns junk, the text is blocked.</li>
