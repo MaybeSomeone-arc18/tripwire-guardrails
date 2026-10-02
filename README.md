@@ -115,8 +115,8 @@ Run `npm test`: 29 tests, all passing in my sandbox (Node 22). CI runs them on N
 
 - Rules: unit tests per category, plus a corpus of 12 benign and 12 hostile strings I wrote by hand. All benign allowed, all hostile blocked. That corpus is a regression check, not a benchmark. I wrote the rules and the strings, so it flatters them.
 - Judge logic: tested against a fake `fetch` (parsing, fail-closed paths, header use, thought parts, always mode).
-- Live Gemma, once, by hand: 8 hand-written texts (3 benign, 5 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. I did not get a model verdict for that text.
-- On those same hostile texts, the rules alone caught none of the paraphrased ones, which is why `always` mode exists.
+- Live Gemma, once, by hand: 8 hand-written texts (4 benign, 4 hostile) sent to `gemma-4-26b-a4b-it` through AI Studio. 7 of 8 got a real verdict and all 7 were correct. The eighth (an output that quotes a made-up system prompt) never got a verdict: the API answered HTTP 500 once and timed out on retries, so the fail-closed path blocked it. I did not get a model verdict for that text.
+- On those same 4 hostile texts, the rules alone blocked none. One was flagged as gray zone (a forged `<system>` tag); the other three had no findings at all. That is why `always` mode exists.
 
 ## What this does not do
 
