@@ -27,32 +27,53 @@ export function extractAnswer(data) {
   return parts.filter((p) => !p.thought).map((p) => p.text ?? "").join("");
 }
 
-export function createJudge({ apiKey, model = "gemma-4-26b-a4b-it", timeoutMs = 15000, fetchImpl = globalThis.fetch } = {}) {
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export function createJudge({
+  apiKey,
+  model = "gemma-4-26b-a4b-it",
+  timeoutMs = 15000,
+  retries = 2,        // extra attempts after the first, for 429/5xx, timeouts and network errors
+  backoffMs = 500,    // doubles each retry
+  fetchImpl = globalThis.fetch,
+  sleepImpl = sleep,
+} = {}) {
   if (!apiKey) throw new Error("createJudge: apiKey is required");
+
+  async function attempt(body) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const res = await fetchImpl(`${ENDPOINT}/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify(body),
+        signal: ctl.signal,
+      });
+      if (!res.ok) return { retry: RETRYABLE.has(res.status), result: { verdict: "block", category: "judge_error", reason: `Judge HTTP ${res.status}, failing closed.` } };
+      const data = await res.json();
+      return { retry: false, result: parseJudgeReply(extractAnswer(data)) };
+    } catch (err) {
+      return { retry: true, result: { verdict: "block", category: "judge_error", reason: `Judge call failed (${err.name}: ${String(err.message).slice(0, 80)}), failing closed.` } };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   return {
     async judge(text, { direction = "input" } = {}) {
       const body = {
         contents: [{ role: "user", parts: [{ text: `${INSTRUCTIONS}\n\nDIRECTION: ${direction}\n<<<TEXT\n${String(text).slice(0, 4000)}\nTEXT>>>` }] }],
         generationConfig: { temperature: 0, maxOutputTokens: 1024 },
       };
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), timeoutMs);
-      try {
-        const res = await fetchImpl(`${ENDPOINT}/${model}:generateContent`, {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify(body),
-          signal: ctl.signal,
-        });
-        if (!res.ok) return { verdict: "block", category: "judge_error", reason: `Judge HTTP ${res.status}, failing closed.` };
-        const data = await res.json();
-        const raw = extractAnswer(data);
-        return parseJudgeReply(raw);
-      } catch (err) {
-        return { verdict: "block", category: "judge_error", reason: `Judge call failed (${err.name}: ${String(err.message).slice(0, 80)}), failing closed.` };
-      } finally {
-        clearTimeout(timer);
+      let last;
+      for (let i = 0; i <= retries; i++) {
+        last = await attempt(body);
+        if (!last.retry) return { ...last.result, attempts: i + 1 };
+        if (i < retries) await sleepImpl(backoffMs * 2 ** i);
       }
+      return { ...last.result, attempts: retries + 1 };
     },
   };
 }
