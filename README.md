@@ -209,7 +209,7 @@ Read the first row as "the rules do what I built them to do on cases I knew abou
 - PII patterns are shape checks. Aadhaar and card numbers are checksum-checked, email and phone are not verified, names and addresses are not detected.
 - Redaction replaces matched spans only.
 - Streaming: text already sent to the client cannot be taken back, and a secret longer than the hold-back window (256 characters by default) can be missed. No per-user policies, no logging.
-- Speed (measured on one machine, Node 22): about 0.05 ms for a one-sentence input and 26 ms for a 100,000-character input. Large inputs are blocked by `maxInputChars` before scanning anyway.
+- Speed (measured on one 2-CPU machine, Node 22, 20,000 runs each): about 0.07 ms per check for a one-sentence input, about 0.6 ms for a 1,100-character input, and 26 ms for a 100,000-character input. That is the rules layer only. A model judge adds a network round trip on top: the local gemma-3-1b-it Q4 on those 2 CPUs took about 2.2 s per call (225 s for 104 calls). I did not time the hosted Gemma call, so I give no number for it. Large inputs are blocked by `maxInputChars` before scanning anyway.
 - Not on npm yet, and `tripwire-guardrails` is unclaimed on the registry as of today (npm view returned 404). Publishing needs an npm account.
 
 ## License
