@@ -104,7 +104,7 @@ const MULTILINGUAL_RULES = [
     pattern: /\b(ignora|olvida|descarta)\b[^.\n]{0,40}\b(instrucciones|reglas)\b|\b(muestra|revela|imprime)\b[^.\n]{0,30}\b(prompt del sistema|instrucciones ocultas)\b/iu,
     reason: "Instruction override or prompt extraction (Spanish)." },
   { id: "inj.fr", category: "prompt_injection", severity: 3,
-    pattern: /\b(ignore|oublie|ignorez)\s+(?:tout(?:es)?\s+)?(?:les|vos|ces|mes|toutes)\b[^.\n]{0,40}\b(instructions|règles)\b|\b(révèle|montre|affiche)\b[^.\n]{0,30}\b(prompt système|instructions cachées)\b/iu,
+    pattern: /\b(ignore|oublie|ignorez)\s+(?:tout(?:es)?\s+)?(?:les|vos|ces|mes|toutes)\b[^.\n]{0,40}\b(instructions|règles)\b|\b(révèle|révèles|montre|affiche|dévoile)\b[^.\n]{0,30}\b(prompt système|message système|instructions cachées|clés secrètes)/iu,
     reason: "Instruction override or prompt extraction (French)." },
   { id: "inj.de", category: "prompt_injection", severity: 3,
     pattern: /\b(ignoriere|vergiss|missachte)\b[^.\n]{0,40}\b(anweisungen|regeln)\b|\b(zeige|verrate|gib)\b[^.\n]{0,30}\b(system-?prompt)\b/iu,
