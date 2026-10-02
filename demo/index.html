@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tripwire guardrails demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Tripwire</h1>
+  <p class="lead">Rule checks for LLM app input and output. Runs entirely in your browser. No text leaves this page.</p>
+  <textarea id="text" aria-label="Text to check"></textarea>
+  <div class="row">
+    <span>Try:</span>
+    <button data-sample="clean">clean</button>
+    <button data-sample="injection">injection</button>
+    <button data-sample="secret">secret</button>
+    <button data-sample="gray">gray zone</button>
+    <button data-sample="pii">PII</button>
+  </div>
+  <div class="row">
+    <label><input type="radio" name="dir" value="input" checked> check as input</label>
+    <label><input type="radio" name="dir" value="output"> check as output</label>
+    <label>block at severity
+      <select id="blockAt"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option></select>
+    </label>
+  </div>
+  <div id="result" role="status"></div>
+  <footer>Rules only here. The optional Gemma judge needs an API key and lives in <code>src/judge.js</code>.</footer>
+</main>
+<script type="module">
+  import { createGuard } from "../src/index.js";
+  window.createGuard = createGuard;
+  await import("./app.js");
+</script>
+</body>
+</html>
