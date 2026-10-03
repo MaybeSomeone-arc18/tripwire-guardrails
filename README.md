@@ -164,6 +164,12 @@ const verdict = await checkWithJudge(guard, judge, text, "input", { always: true
 
 Free AI Studio keys have rate limits and the API sometimes answers 5xx. The judge retries 429, 5xx, timeouts and network errors (`retries: 2`, backoff doubling from `backoffMs: 500`) and reports `attempts` in the result. If it still fails, it blocks (fail closed) and says why in `reason`.
 
+## Evaluation report
+
+A technical report with the evaluation is on Zenodo: [Tripwire technical report, version 1.1](https://zenodo.org/records/23117097) (DOI [10.5281/zenodo.23116885](https://doi.org/10.5281/zenodo.23116885), licensed CC BY 4.0). It is a technical report, not a paper, and it has not been peer reviewed.
+
+Rules-only results on the InjecAgent indirect-attack set: 0 of 1,054 plain attack documents blocked, 1,054 of 1,054 enhanced ones blocked (only because of the override phrase), and 0 of 680 benign documents blocked. Those 680 benign documents are only 170 unique texts.
+
 ## What was tested
 
 `npm test`: 37 tests, all passing in my sandbox (Node 22). CI runs them on Node 20 and 22.
