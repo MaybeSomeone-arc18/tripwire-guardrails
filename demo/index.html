@@ -134,9 +134,8 @@ npx github:MaybeSomeone-arc18/tripwire-guardrails "ignore all previous instructi
     <div class="bar" style="--v:100"><div class="row"><span>Tuned set, rules alone <small>(39 hostile, 50 benign, 0 false positives)</small></span><b>100%</b></div><div class="track"><i></i></div></div>
     <div class="bar hl" style="--v:41.7"><div class="row"><span>Held-out set, rules alone <small>(24 hostile, 24 benign, 0 false positives)</small></span><b>41.7%</b></div><div class="track"><i></i></div></div>
     <div class="bar hl" style="--v:20"><div class="row"><span>Outside benchmark (deepset test split), rules alone <small>(60 hostile, 56 benign, 0 false positives; 1.7% before my fixes)</small></span><b>20.0%</b></div><div class="track"><i></i></div></div>
-    <div class="bar hl" style="--v:91.7"><div class="row"><span>Held-out set, rules plus Gemma</span><b>91.7%</b></div><div class="track"><i></i></div></div>
   </div>
-  <p class="fine">Recall on hostile texts. Gemma (<code>gemma-4-26b-a4b-it</code>, AI Studio free tier) gave a real block on 22 of 24; calls that failed are blocked but not counted as caught. On benign texts it falsely blocked 1 (a card-shaped student ID). 3 of 38 calls failed after retries. One run, 48 texts, one author: a rough signal, not a benchmark.</p>
+  <p class="fine">Recall on hostile texts, rules only. The optional Gemma judge exists, but its accuracy is not evaluated here: treat it as an untested extra layer and measure it on your own data.</p>
 </section>
 
 <section id="limits" class="block">
